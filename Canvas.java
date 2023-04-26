@@ -39,6 +39,7 @@ public class Canvas {
     public static final int POLY_TOOL = 3;
     public static final int SQUARE_TOOL = 4;
     public static final int CIRCLE_TOOL = 5;
+    public static final int FILL_TOOL = 6;
 
     //public static final int TEXT_TOOL = 2;
 
@@ -198,6 +199,7 @@ public class Canvas {
             final JRadioButton poly = new JRadioButton("Polygon");
             final JRadioButton square = new JRadioButton("Square");
             final JRadioButton circle = new JRadioButton("Circle");
+            final JRadioButton fill = new JRadioButton("Fill");
 
 
 
@@ -207,7 +209,8 @@ public class Canvas {
             tb.add(select);          
             tb.add(poly);
             tb.add(square);
-            tb.add(circle);        
+            tb.add(circle);
+            tb.add(fill);        
            // tools.add(text);
 
             ButtonGroup bg = new ButtonGroup();
@@ -467,6 +470,9 @@ public class Canvas {
     //     }
     // }
 
+    public void fill(Point point){
+
+    }
     public void draw(Point point) {
         Graphics2D g = this.canvasImage.createGraphics();
         g.setRenderingHints(renderingHints);
