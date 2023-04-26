@@ -5,6 +5,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.lang.Thread.State;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
@@ -23,6 +24,7 @@ public class Canvas {
     private BufferedImage originalImage;
     /** Image used to make changes. */
     private BufferedImage canvasImage;
+    private ArrayList<BufferedImage> layers = new ArrayList<BufferedImage>();
     /** The main GUI that might be added to a frame or applet. */
     private JPanel gui;
     /** The color to use when calling clear, text or other 
@@ -56,9 +58,7 @@ public class Canvas {
     private Stroke stroke = new BasicStroke(
             3,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND,1.7f);
     private RenderingHints renderingHints;
-    // = new RenderingHints(
-    //     RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON
-    // );
+
 
 
     public JComponent getGui() {
@@ -69,24 +69,21 @@ public class Canvas {
             hintsMap.put(RenderingHints.KEY_DITHERING, RenderingHints.VALUE_DITHER_ENABLE);
             hintsMap.put(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             hintsMap.put(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            hintsMap.put(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY); //transparency
             renderingHints = new RenderingHints(hintsMap); 
 
-
-            
             gui = new JPanel(new BorderLayout(4,4));
             gui.setBorder(new EmptyBorder(5,3,5,3));
-            setImage(new BufferedImage(750,500,BufferedImage.TYPE_INT_RGB));
-
+            setImage(new BufferedImage(1250,900,BufferedImage.TYPE_INT_RGB));
 
             JPanel imageView = new JPanel(new GridBagLayout());
-            imageView.setPreferredSize(new Dimension(750,500));
+            imageView.setPreferredSize(new Dimension(1250,900));
             imageLabel = new JLabel(new ImageIcon(canvasImage));
             JScrollPane imageScroll = new JScrollPane(imageView);
             imageView.add(imageLabel);
             imageLabel.addMouseMotionListener(new ImageMouseMotionListener());
             imageLabel.addMouseListener(new ImageMouseListener());
             gui.add(imageScroll,BorderLayout.CENTER);
-
 
             JToolBar tb = new JToolBar();
             tb.setFloatable(false);
@@ -95,7 +92,6 @@ public class Canvas {
             final JRadioButton draw = new JRadioButton(drawIcon, true);
 
             tb.add(draw); 
-
 
             JButton colorButton = new JButton(); //color stuff
             colorButton.setMnemonic('o');
@@ -243,6 +239,18 @@ public class Canvas {
             bg.add(poly);
             bg.add(square);
             bg.add(circle);  
+
+            JButton addLayer = new JButton("add layer");
+            tb.add(addLayer);
+            ActionListener addLayerListener = new ActionListener() {
+                public void actionPerformed(ActionEvent arg0) {
+                    layers.add(1, new BufferedImage(1250, 900, BufferedImage.TYPE_INT_RGB));
+                    Graphics2D g = originalImage.createGraphics();
+                    g.drawImage(layers.get(1), 0, 0, null);
+
+                }
+            };
+            
             ActionListener toolGroupListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
