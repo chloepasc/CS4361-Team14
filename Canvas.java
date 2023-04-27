@@ -21,7 +21,33 @@ public class Canvas {
     private BufferedImage originalImage;
     /** Image used to make changes. */
     private BufferedImage canvasImage;
-    /** The main GUI that might be added to a frame or applet. */
+
+    //TOOL VARIABLES
+    private int activeTool;
+    //public static final int SELECTION_TOOL = 1;
+    public static final int DRAW_TOOL = 0;
+    public static final int FILL_TOOL = 1;
+    public static final int ERASE_TOOL = 2;
+    public static final int SHAPE_TOOL = 3;
+    private Point start = (null);
+    private Point end = (null);
+    private Rectangle rect = null;
+    private Ellipse2D.Double circle = null;
+    private ArrayList<Point> points = new ArrayList<Point>();
+    private ArrayList<Point> erasePoints = new ArrayList<Point>();
+    private static final String[] SHAPES = {"Line", "Rectangle", "Circle"};
+    private String selectedShape = "Line";
+    private Stroke drawStroke = new BasicStroke(
+        3,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND,1.7f);
+    private Stroke eraseStroke = new BasicStroke(
+        3,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND,1.7f);
+    private Stroke shapeStroke = new BasicStroke(
+        3,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND,1.7f);
+    private RenderingHints renderingHints;
+  //  private Shape currentShape;
+  //  private DrawingArea drawingArea;
+
+    //GENERAL GUI VARIABLES
     private JPanel gui;
     /** The color to use when calling clear, text or other 
      * drawing functionality. */
@@ -95,7 +121,14 @@ public class Canvas {
             tb.add(colorButton);
             setColor(color);
 
-            JSlider strokeSlider = new JSlider(JSlider.HORIZONTAL, 1, 100, 1); //draw slider+spinner
+        
+            ImageIcon fillIcon = new ImageIcon("fillIcon.png");
+            final JRadioButton fill = new JRadioButton(fillIcon);
+            tb.add(fill);
+
+            ImageIcon drawIcon = new ImageIcon("drawIcon.png");
+            final JRadioButton draw = new JRadioButton(drawIcon, true);
+            tb.add(draw); 
 
             final SpinnerNumberModel strModel = new SpinnerNumberModel(1, 1, 100, 1);
             JSpinner strokeSpinner = new JSpinner(strModel);
@@ -194,33 +227,15 @@ public class Canvas {
 
             JToolBar tools = new JToolBar(JToolBar.HORIZONTAL);
             tools.setFloatable(false);
-            JButton crop = new JButton("Crop");
-            final JRadioButton select = new JRadioButton("Select");
-            final JRadioButton poly = new JRadioButton("Polygon");
-            final JRadioButton square = new JRadioButton("Square");
-            final JRadioButton circle = new JRadioButton("Circle");
-            final JRadioButton fill = new JRadioButton("Fill");
-
-
-
-          //  final JRadioButton text = new JRadioButton("Text");
-
-            tb.add(crop);            
-            tb.add(select);          
-            tb.add(poly);
-            tb.add(square);
-            tb.add(circle);
-            tb.add(fill);        
-           // tools.add(text);
+            //final JRadioButton select = new JRadioButton("Select");
 
             ButtonGroup bg = new ButtonGroup();
-            bg.add(select);
-           // bg.add(text);
+           // bg.add(select);
             bg.add(draw);
             bg.add(erase);   
-            bg.add(poly);
-            bg.add(square);
-            bg.add(circle);  
+            bg.add(shapeButton);
+            bg.add(fill);
+
             ActionListener toolGroupListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
@@ -232,17 +247,19 @@ public class Canvas {
                     //     activeTool = TEXT_TOOL;
                     }else if (ae.getSource()==erase) {
                         activeTool = ERASE_TOOL;
-                    }else if (ae.getSource()==poly) {
-                        activeTool = POLY_TOOL;
-                    }else if (ae.getSource()==square) {
-                        activeTool = SQUARE_TOOL;
-                    }else if (ae.getSource()==circle) {
-                        activeTool = CIRCLE_TOOL;
+                    }else if (ae.getSource()==shapeButton) {
+                        activeTool = SHAPE_TOOL;
+                    }else if (ae.getSource()==fill){
+                        activeTool = FILL_TOOL;
                     }
                 }
             };
-            select.addActionListener(toolGroupListener);
+            //select.addActionListener(toolGroupListener);
             draw.addActionListener(toolGroupListener);
+            erase.addActionListener(toolGroupListener);
+            shapeButton.addActionListener(toolGroupListener);
+            fill.addActionListener(toolGroupListener);
+
            // text.addActionListener(toolGroupListener);
 
             gui.add(tools, BorderLayout.LINE_END);
@@ -456,22 +473,19 @@ public class Canvas {
         SwingUtilities.invokeLater(r);
     }
 
-    // public void text(Point point) {
-    //     String text = JOptionPane.showInputDialog(gui, "Text to add", "Text");
-    //     if (text!=null) {
-    //         Graphics2D g = this.canvasImage.createGraphics();
-    //         g.setRenderingHints(renderingHints);
-    //         g.setColor(this.color);
-    //         g.setStroke(stroke);
-    //         int n = 0;
-    //         g.drawString(text,point.x,point.y);
-    //         g.dispose();
-    //         this.imageLabel.repaint();
-    //     }
-    // }
 
-    public void fill(Point point){
+    public void fill(Point point) throws AWTException{
 
+        Graphics2D g = this.canvasImage.createGraphics();
+        g.setColor(this.color);
+        System.out.println(point.x);
+        System.out.println(point.y);
+        
+        Robot rb= new Robot();
+        System.out.println(rb.getPixelColor(point.x, point.y));
+        //int color = 
+        //point.
+        
     }
     public void draw(Point point) {
         Graphics2D g = this.canvasImage.createGraphics();
@@ -482,6 +496,83 @@ public class Canvas {
         g.drawLine(point.x, point.y, point.x+n, point.y+n);
         g.dispose();
         this.imageLabel.repaint();
+    }
+
+    public void shapeDrawer(Point point, String action){
+        Graphics2D g = this.canvasImage.createGraphics();
+        g.setRenderingHints(renderingHints);
+        g.setColor(color);
+        g.setStroke(shapeStroke);
+
+        if(selectedShape.equals("Rectangle")){
+            if(action.equals("press")){
+                start = point;
+
+            }else if(action.equals("drag")){
+                end = point;
+                int x = Math.min(start.x, end.x);
+                int y = Math.min(start.y, end.y);
+                int width = Math.abs(start.x - end.x);
+                int height = Math.abs(start.y - end.y);
+                rect = new Rectangle(x, y, width, height);
+                this.imageLabel.repaint();
+            }else if(action.equals("release")){
+                end = point;
+                int x = Math.min(start.x, end.x);
+                int y = Math.min(start.y, end.y);
+                int width = Math.abs(start.x - end.x);
+                int height = Math.abs(start.y - end.y);
+                rect = new Rectangle(x, y, width, height);
+                g.fill(rect);
+                this.imageLabel.repaint();
+            }
+        }else if(selectedShape.equals("Line")){
+            g.setStroke(shapeStroke);
+            if(action.equals("press")){
+                start = point;
+            }else if(action.equals("drag")){
+                end = point;
+                this.imageLabel.repaint();
+            }else if(action.equals("release")){
+                end = point;
+                g.drawLine(start.x, start.y, end.x, end.y);                
+                this.imageLabel.repaint();
+            }
+        }else if(selectedShape.equals("Circle")){
+            if(action.equals("press")){
+                start = point;
+            }else if(action.equals("drag")){
+                end = point;
+                int x = Math.min(start.x, end.x);
+                int y = Math.min(start.y, end.y);
+                int diameter = Math.max(Math.abs(start.x - end.x), Math.abs(start.y - end.y));
+                circle = new Ellipse2D.Double(x, y, diameter, diameter);
+                this.imageLabel.repaint();
+            }else if(action.equals("release")){
+                end = point;                
+                int x = Math.min(start.x, end.x);
+                int y = Math.min(start.y, end.y);
+                int diameter = Math.max(Math.abs(start.x - end.x), Math.abs(start.y - end.y));
+                circle = new Ellipse2D.Double(x, y, diameter, diameter);
+                g.fill(circle);    
+                this.imageLabel.repaint();            
+            }
+        }
+            g.dispose();
+    }
+
+    public BufferedImage createImage(JPanel panel) {
+
+        int w = panel.getWidth();
+        System.out.println("width = "+ w);
+        int h = panel.getHeight();
+        System.out.println("height = " +h);
+
+        BufferedImage bi = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = bi.createGraphics();
+        panel.paint(g);
+        g.dispose();
+        return bi;
     }
 
     class ImageMouseListener extends MouseAdapter {
@@ -497,7 +588,21 @@ public class Canvas {
             // } else if (activeTool==Canvas.TEXT_TOOL) {
             //     // TODO
             //     text(arg0.getPoint());
-            } else {
+            } else if (activeTool==Canvas.ERASE_TOOL) {
+                System.out.println("eraser clicked");
+                erase(arg0.getPoint());
+            }else if(activeTool==Canvas.SHAPE_TOOL){
+                System.out.println("shape clicked");
+                shapeDrawer(arg0.getPoint(), "press");
+            }else if(activeTool==Canvas.FILL_TOOL){
+                System.out.println("fill clicked");
+                try {
+                    fill(arg0.getPoint());
+                } catch (AWTException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }else{
                 JOptionPane.showMessageDialog(
                         gui, 
                         "Application error.  :(", 
