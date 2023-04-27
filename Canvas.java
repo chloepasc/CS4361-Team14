@@ -114,10 +114,6 @@ public class Canvas extends JPanel{
             final JRadioButton draw = new JRadioButton(drawIcon, true);
             tb.add(draw); 
 
-            ImageIcon drawIcon = new ImageIcon("drawIcon.png");
-            final JRadioButton draw = new JRadioButton(drawIcon, true);
-            tb.add(draw); 
-
             JSlider drawSlider = new JSlider(JSlider.HORIZONTAL, 1, 100, 25); //draw slider+spinner
 
             final SpinnerNumberModel strModel = new SpinnerNumberModel(25, 1, 100, 1);
