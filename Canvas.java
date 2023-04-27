@@ -1,9 +1,12 @@
 import java.awt.*;
 import java.awt.RenderingHints.Key;
 import java.awt.event.*;
+import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.ImageObserver;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,11 +18,9 @@ import javax.swing.event.ChangeListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
-public class Canvas {
+public class Canvas extends JPanel{
 
-    /** Reference to the original image. */
     private BufferedImage originalImage;
-    /** Image used to make changes. */
     private BufferedImage canvasImage;
 
     //TOOL VARIABLES
@@ -49,47 +50,33 @@ public class Canvas {
 
     //GENERAL GUI VARIABLES
     private JPanel gui;
-    /** The color to use when calling clear, text or other 
-     * drawing functionality. */
-    private Color color = Color.GRAY;
-    /** General user messages. */
+    private JPanel imageView;
+    private Color color = Color.RED;
+    private Color bgColor = Color.WHITE;
     private JLabel output = new JLabel("Drawing App");
-
     private BufferedImage colorSample = new BufferedImage(
             16,16,BufferedImage.TYPE_INT_RGB);
     private JLabel imageLabel;
-    private int activeTool;
-    public static final int SELECTION_TOOL = 1;
-    public static final int DRAW_TOOL = 0;
-    public static final int ERASE_TOOL = 2;
-    public static final int POLY_TOOL = 3;
-    public static final int SQUARE_TOOL = 4;
-    public static final int CIRCLE_TOOL = 5;
-    public static final int FILL_TOOL = 6;
-
-    //public static final int TEXT_TOOL = 2;
-
-    private Point selectionStart; 
-    private Rectangle selection;
+    //int canvasWidth, canvasHeight;
     private boolean dirty = false;
-    private Stroke stroke = new BasicStroke(
-            3,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND,1.7f);
-    private RenderingHints renderingHints;
 
     public JComponent getGui() {
+
         if (gui==null) {
             Map<Key, Object> hintsMap = new HashMap<RenderingHints.Key,Object>();
             hintsMap.put(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             hintsMap.put(RenderingHints.KEY_DITHERING, RenderingHints.VALUE_DITHER_ENABLE);
+            hintsMap.put(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             hintsMap.put(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            hintsMap.put(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY); //transparency
             renderingHints = new RenderingHints(hintsMap); 
 
-            setImage(new BufferedImage(320,240,BufferedImage.TYPE_INT_RGB));
             gui = new JPanel(new BorderLayout(4,4));
             gui.setBorder(new EmptyBorder(5,3,5,3));
+            setImage(new BufferedImage(1250,900,BufferedImage.TYPE_INT_RGB));
 
-            JPanel imageView = new JPanel(new GridBagLayout());
-            imageView.setPreferredSize(new Dimension(480,320));
+            imageView = new JPanel(new GridBagLayout());
+            imageView.setPreferredSize(new Dimension(1250,900));
             imageLabel = new JLabel(new ImageIcon(canvasImage));
             JScrollPane imageScroll = new JScrollPane(imageView);
             imageView.add(imageLabel);
@@ -100,11 +87,7 @@ public class Canvas {
             JToolBar tb = new JToolBar();
             tb.setFloatable(false);
 
-            final JRadioButton draw = new JRadioButton("Draw", true);
-            tb.add(draw); 
-
-
-            JButton colorButton = new JButton("Color"); //color stuff
+            JButton colorButton = new JButton();
             colorButton.setMnemonic('o');
             colorButton.setToolTipText("Choose a Color");
             ActionListener colorListener = new ActionListener() {
@@ -116,6 +99,7 @@ public class Canvas {
                     }
                 }
             };
+
             colorButton.addActionListener(colorListener);
             colorButton.setIcon(new ImageIcon(colorSample));
             tb.add(colorButton);
@@ -130,42 +114,47 @@ public class Canvas {
             final JRadioButton draw = new JRadioButton(drawIcon, true);
             tb.add(draw); 
 
-            final SpinnerNumberModel strModel = new SpinnerNumberModel(1, 1, 100, 1);
-            JSpinner strokeSpinner = new JSpinner(strModel);
-            strokeSpinner.addChangeListener(new ChangeListener()
+            JSlider drawSlider = new JSlider(JSlider.HORIZONTAL, 1, 100, 25); //draw slider+spinner
+
+            final SpinnerNumberModel strModel = new SpinnerNumberModel(25, 1, 100, 1);
+            JSpinner drawSpinner = new JSpinner(strModel);
+            drawSpinner.addChangeListener(new ChangeListener()
             {
                 @Override
                 public void stateChanged(ChangeEvent e)
                 {
-                    Object o = strokeSpinner.getValue();
+                    activeTool = DRAW_TOOL;
+                    Object o = drawSpinner.getValue();
                     Integer i = (Integer)o; 
 
-                    strokeSlider.setValue((int)strokeSpinner.getValue());
-                    stroke = new BasicStroke(
+                    drawSlider.setValue((int)drawSpinner.getValue());
+                    drawStroke = new BasicStroke(
                             i.intValue(),
                             BasicStroke.CAP_ROUND,
                             BasicStroke.JOIN_ROUND,
                             1.7f);
                 }
             });
-            tb.add(strokeSpinner);
+            tb.add(drawSpinner);
             tb.addSeparator();
 
-            strokeSlider.addChangeListener(new ChangeListener() {
+            drawSlider.addChangeListener(new ChangeListener() {
                 @Override
                 public void stateChanged(ChangeEvent e){
-                    Integer value = strokeSlider.getValue();
-                    strokeSpinner.setValue((int) strokeSlider.getValue());
-                    stroke = new BasicStroke(
+                    activeTool = DRAW_TOOL;
+                    Integer value = drawSlider.getValue();
+                    drawSpinner.setValue((int) drawSlider.getValue());
+                    drawStroke = new BasicStroke(
                         value.intValue(),
                         BasicStroke.CAP_ROUND,
                         BasicStroke.JOIN_ROUND,
                         1.7f);
                 }
             });
-            tb.add(strokeSlider);
+            tb.add(drawSlider);
 
-            final JRadioButton erase = new JRadioButton("Erase");
+            ImageIcon eraseIcon = new ImageIcon("eraseIcon.png");
+            final JRadioButton erase = new JRadioButton(eraseIcon);
             tb.add(erase);   
 
             JSlider eraseSlider = new JSlider(JSlider.HORIZONTAL, 1, 100, 1); //draw slider+spinner
@@ -177,11 +166,12 @@ public class Canvas {
                 @Override
                 public void stateChanged(ChangeEvent e)
                 {
+                    activeTool = ERASE_TOOL;
                     Object o = eraseSpinner.getValue();
                     Integer i = (Integer)o; 
 
                     eraseSlider.setValue((int)eraseSpinner.getValue());
-                    stroke = new BasicStroke(
+                    eraseStroke = new BasicStroke(
                             i.intValue(),
                             BasicStroke.CAP_ROUND,
                             BasicStroke.JOIN_ROUND,
@@ -194,9 +184,10 @@ public class Canvas {
             eraseSlider.addChangeListener(new ChangeListener() {
                 @Override
                 public void stateChanged(ChangeEvent e){
+                    activeTool = ERASE_TOOL;
                     Integer value = eraseSlider.getValue();
                     eraseSpinner.setValue((int) eraseSlider.getValue());
-                    stroke = new BasicStroke(
+                    eraseStroke = new BasicStroke(
                         value.intValue(),
                         BasicStroke.CAP_ROUND,
                         BasicStroke.JOIN_ROUND,
@@ -204,6 +195,49 @@ public class Canvas {
                 }
             });
             tb.add(eraseSlider);
+
+            JRadioButton shapeButton = new JRadioButton("Shapes");
+            tb.add(shapeButton);
+            JComboBox<String> shapes = new JComboBox<>(SHAPES);
+            tb.add(shapes);
+            shapes.addActionListener(evt -> this.selectedShape = ((JComboBox) evt.getSource()).getSelectedItem().toString());
+            JSlider shapeSlider = new JSlider(JSlider.HORIZONTAL, 1, 100, 1); //draw slider+spinner
+
+            final SpinnerNumberModel spModel = new SpinnerNumberModel(1, 1, 100, 1);
+            JSpinner shapeSpinner = new JSpinner(spModel);
+            shapeSpinner.addChangeListener(new ChangeListener()
+            {
+                @Override
+                public void stateChanged(ChangeEvent e)
+                {
+                    activeTool = SHAPE_TOOL;
+                    Object o = shapeSpinner.getValue();
+                    Integer i = (Integer)o; 
+
+                    shapeSlider.setValue((int)shapeSpinner.getValue());
+                    shapeStroke = new BasicStroke(
+                            i.intValue(),
+                            BasicStroke.CAP_ROUND,
+                            BasicStroke.JOIN_ROUND,
+                            1.7f);
+                }
+            });
+            tb.add(shapeSpinner);
+            tb.addSeparator();
+            shapeSlider.addChangeListener(new ChangeListener() {
+                @Override
+                public void stateChanged(ChangeEvent e){
+                    activeTool = SHAPE_TOOL;
+                    Integer value = shapeSlider.getValue();
+                    shapeSpinner.setValue((int) shapeSlider.getValue());
+                    shapeStroke = new BasicStroke(
+                        value.intValue(),
+                        BasicStroke.CAP_ROUND,
+                        BasicStroke.JOIN_ROUND,
+                        1.7f);
+                }
+            });
+            tb.add(shapeSlider);
 
 
 
@@ -239,12 +273,8 @@ public class Canvas {
             ActionListener toolGroupListener = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent ae) {
-                    if (ae.getSource()==select) {
-                        activeTool = SELECTION_TOOL;
-                    } else if (ae.getSource()==draw) {
+                    if (ae.getSource()==draw) {
                         activeTool = DRAW_TOOL;
-                    // } else if (ae.getSource()==text) {
-                    //     activeTool = TEXT_TOOL;
                     }else if (ae.getSource()==erase) {
                         activeTool = ERASE_TOOL;
                     }else if (ae.getSource()==shapeButton) {
@@ -272,13 +302,16 @@ public class Canvas {
         return gui;
     }
 
-    /** Clears the entire image area by painting it with the current color. */
     public void clear(BufferedImage bi) {
         Graphics2D g = bi.createGraphics();
         g.setRenderingHints(renderingHints);
-        g.setColor(color);
+        if(bi == colorSample){
+            g.setColor(color);
+        }
+        else{
+            g.setColor(bgColor);
+        }
         g.fillRect(0, 0, bi.getWidth(), bi.getHeight());
-
         g.dispose();
         imageLabel.repaint();
     }
@@ -293,18 +326,8 @@ public class Canvas {
         g.setRenderingHints(renderingHints);
         g.drawImage(image, 0, 0, gui);
         g.dispose();
-
-        selection = new Rectangle(0,0,w,h); 
-        if (this.imageLabel!=null) {
-            imageLabel.setIcon(new ImageIcon(canvasImage));
-            this.imageLabel.repaint();
-        }
-        if (gui!=null) {
-            gui.invalidate();
-        }
     }
 
-    /** Set the current painting color and refresh any elements needed. */
     public void setColor(Color color) {
         this.color = color;
         clear(colorSample);
@@ -320,13 +343,13 @@ public class Canvas {
             @Override
             public void actionPerformed(ActionEvent arg0) {
                 BufferedImage bi = new BufferedImage(
-                        360, 300, BufferedImage.TYPE_INT_ARGB);
+                        1500, 1000, BufferedImage.TYPE_INT_ARGB);
                 clear(bi);
                 setImage(bi);
             }
         };
         newImageItem.addActionListener(newImage);
-        file.add(newImageItem);
+        //file.add(newImageItem);
 
         if (webstart) {
             //TODO Add open/save functionality using JNLP API
@@ -359,7 +382,7 @@ public class Canvas {
             JMenuItem openItem = new JMenuItem("Open");
             openItem.setMnemonic('o');
             openItem.addActionListener(openListener);
-            file.add(openItem);
+           // file.add(openItem);
 
             ActionListener saveListener = new ActionListener() {
 
@@ -421,7 +444,6 @@ public class Canvas {
             chooser.setFileFilter(ff);
         }
         return chooser;
-
     }
 
     public boolean canExit() {
@@ -436,7 +458,6 @@ public class Canvas {
             } catch(Exception stayFalse) {
             }
         }
-
         return canExit;
     }
 
@@ -447,6 +468,7 @@ public class Canvas {
     }
 
     public static void main(String[] args) {
+
         Runnable r = new Runnable() {
             @Override
             public void run() {
@@ -456,9 +478,11 @@ public class Canvas {
                 } catch (Exception e) {
                     // use default
                 }
+
                 Canvas bp = new Canvas();
 
                 JFrame f = new JFrame("Drawing App");
+
                 f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
                 f.setLocationByPlatform(true);
 
@@ -467,7 +491,9 @@ public class Canvas {
 
                 f.pack();
                 f.setMinimumSize(f.getSize());
+
                 f.setVisible(true);
+
             }
         };
         SwingUtilities.invokeLater(r);
@@ -488,12 +514,45 @@ public class Canvas {
         
     }
     public void draw(Point point) {
+        points.add(new Point(point));
+        Point midpoint = new Point(0,0);
+
         Graphics2D g = this.canvasImage.createGraphics();
         g.setRenderingHints(renderingHints);
         g.setColor(this.color);
-        g.setStroke(stroke);
+        g.setStroke(drawStroke);
         int n = 0;
-        g.drawLine(point.x, point.y, point.x+n, point.y+n);
+        for (int i = 0; i < points.size() - 1; i++){
+            Point p1 = points.get(i);
+            Point p2 = points.get(i+1);
+
+            midpoint.x = ((p1.x+p2.x)/2);
+            midpoint.y = ((p1.y+p2.y)/2);
+
+            g.drawLine(p1.x, p1.y, ((p1.x+midpoint.x)/2), ((p1.y+midpoint.y)/2));
+            g.drawLine(((p1.x+midpoint.x)/2), ((p1.y+midpoint.y)/2), midpoint.x, midpoint.y);
+            g.drawLine(midpoint.x, midpoint.y, ((p2.x+midpoint.x)/2), ((p2.y+midpoint.y)/2));
+            g.drawLine(((p2.x+midpoint.x)/2), ((p2.y+midpoint.y)/2), p2.x, p2.y);
+
+        }
+        g.dispose();
+        this.imageLabel.repaint();
+    }
+
+    public void erase(Point point) {
+        System.out.println("enter erase");
+        erasePoints.add(new Point(point));
+        Graphics2D g = this.canvasImage.createGraphics();
+        g.setRenderingHints(renderingHints);
+        g.setColor(bgColor);
+        g.setStroke(eraseStroke);
+        int n = 0;
+        for (int i = 0; i < erasePoints.size() - 1; i++){
+            Point p1 = erasePoints.get(i);
+            Point p2 = erasePoints.get(i+1);
+            g.drawLine(p1.x, p1.y, p2.x, p2.y);
+            System.out.println("erasing");
+        }        
         g.dispose();
         this.imageLabel.repaint();
     }
@@ -579,11 +638,7 @@ public class Canvas {
 
         @Override
         public void mousePressed(MouseEvent arg0) {
-            // TODO Auto-generated method stub
-            if (activeTool==Canvas.SELECTION_TOOL) {
-                selectionStart = arg0.getPoint();
-            } else if (activeTool==Canvas.DRAW_TOOL) {
-                // TODO
+            if (activeTool==Canvas.DRAW_TOOL) {
                 draw(arg0.getPoint());
             // } else if (activeTool==Canvas.TEXT_TOOL) {
             //     // TODO
@@ -605,7 +660,7 @@ public class Canvas {
             }else{
                 JOptionPane.showMessageDialog(
                         gui, 
-                        "Application error.  :(", 
+                        "Application error", 
                         "Error!", 
                         JOptionPane.ERROR_MESSAGE);
             }
@@ -613,12 +668,12 @@ public class Canvas {
 
         @Override
         public void mouseReleased(MouseEvent arg0) {
-            if (activeTool==Canvas.SELECTION_TOOL) {
-                selection = new Rectangle(
-                        selectionStart.x,
-                        selectionStart.y,
-                        arg0.getPoint().x,
-                        arg0.getPoint().y);
+            if (activeTool==Canvas.DRAW_TOOL){
+                points.clear();
+            }else if (activeTool==Canvas.ERASE_TOOL){
+                erasePoints.clear();
+            }else if(activeTool==Canvas.SHAPE_TOOL){
+                shapeDrawer(arg0.getPoint(), "release");
             }
         }
     }
@@ -628,14 +683,12 @@ public class Canvas {
         @Override
         public void mouseDragged(MouseEvent arg0) {
             reportPositionAndColor(arg0);
-            if (activeTool==Canvas.SELECTION_TOOL) {
-                selection = new Rectangle(
-                        selectionStart.x,
-                        selectionStart.y,
-                        arg0.getPoint().x-selectionStart.x,
-                        arg0.getPoint().y-selectionStart.y);
-            } else if (activeTool==Canvas.DRAW_TOOL) {
+            if (activeTool==Canvas.DRAW_TOOL) {
                 draw(arg0.getPoint());
+            } else if (activeTool==Canvas.ERASE_TOOL) {
+                erase(arg0.getPoint());
+            } else if (activeTool==Canvas.SHAPE_TOOL){
+                shapeDrawer(arg0.getPoint(), "drag");
             }
         }
 
@@ -646,20 +699,24 @@ public class Canvas {
 
     }
 
+    @Override
+    public void paint(Graphics g) {
+            super.paint(g);
+        if (rect != null) {
+            Graphics2D g2d = (Graphics2D) g;
+            g2d.setRenderingHints(renderingHints);
+            g2d.setColor(this.color);
+            g2d.setStroke(drawStroke);
+            g2d.draw(rect);
+        }
+    }
+
+
     private void reportPositionAndColor(MouseEvent me) {
         String text = "";
-        if (activeTool==Canvas.SELECTION_TOOL) {
-            text += "Selection (X,Y:WxH): " + 
-                    (int)selection.getX() +
-                    "," +
-                    (int)selection.getY() +
-                    ":" +
-                    (int)selection.getWidth() +
-                    "x" +
-                    (int)selection.getHeight();
-        } else {
+
             text += "X,Y: " + (me.getPoint().x+1) + "," + (me.getPoint().y+1);
-        }
+
         output.setText(text);
     }
 }
